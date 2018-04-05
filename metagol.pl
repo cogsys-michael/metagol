@@ -1,6 +1,6 @@
 %% This is a copyrighted file under the BSD 3-clause licence, details of which can be found in the root directory.
 
-:- module(metagol,[learn/2,learn/3,learn_seq/2,pprint/1,op(950,fx,'@')]).
+:- module(metagol,[learn/2,learn/3,learn_seq/2,metagol_relaxed/5,pprint/1,op(950,fx,'@')]).
 
 :- user:use_module(library(lists)).
 
@@ -33,13 +33,26 @@ default(max_inv_preds(10)).
 learn(Pos1,Neg1):-
     learn(Pos1,Neg1,Prog),
     pprint(Prog).
-
+    
 learn(Pos1,Neg1,Prog):-
-    maplist(atom_to_list,Pos1,Pos2),
-    maplist(atom_to_list,Neg1,Neg2),
-    proveall(Pos2,Sig,Prog),
-    nproveall(Neg2,Sig,Prog),
-    is_functional(Pos2,Sig,Prog).
+  maplist(atom_to_list,Pos1,Pos2),
+  maplist(atom_to_list,Neg1,Neg2),
+  proveall(Pos2,Sig,Prog),
+  nproveall(Neg2,Sig,Prog),
+  is_functional(Pos2,Sig,Prog).
+  
+% metagol_relaxed(+Pos,+Neg,+MaxFP,-Prog,-TrueFP)
+%
+% Learn a theory Prog from positive examples Pos and
+% negative examples Neg. During learning up to MaxFP
+% false positives are allowed. TrueFP unifies with 
+% the actual number of false positives.
+metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
+  maplist(atom_to_list,Pos1,Pos2),
+  maplist(atom_to_list,Neg1,Neg2),
+  proveall(Pos2,Sig,Prog),
+  nprovemax(Neg2,Sig,Prog,MaxFP,TrueFP),
+  is_functional(Pos2,Sig,Prog).
 
 learn_seq(Seq,Prog):-
     maplist(learn_task,Seq,Progs),
@@ -146,6 +159,20 @@ nproveall([],_PS,_Prog):- !.
 nproveall([Atom|Atoms],PS,Prog):-
     \+ prove_deduce([Atom],PS,Prog),
     nproveall(Atoms,PS,Prog).
+
+% nprovemax(+Atoms,+PS,+Prog,+MaxFP,-TrueFP)
+% 
+% Tries to disprove all Atoms given the signature PS and
+% the current program Prog.
+% Succeeds if up to MaxFP atoms are proven. TrueFP 
+% unifies with the number of proven atoms.
+nprovemax([],_PS,_Prog,_MaxFP,0) :- !.
+nprovemax(Atoms,PS,Prog,0,0) :- nproveall(Atoms,PS,Prog), !.
+nprovemax([Atom|Atoms],PS,Prog,MaxFP,TrueFP) :-
+  prove_deduce([Atom],PS,Prog) -> 
+    succ(MaxFP1,MaxFP), nprovemax(Atoms,PS,Prog,MaxFP1,TrueFP1), succ(TrueFP1,TrueFP);
+    nprovemax(Atoms,PS,Prog,MaxFP,TrueFP).
+
 
 iterator(N):-
     get_option(min_clauses(MinN)),

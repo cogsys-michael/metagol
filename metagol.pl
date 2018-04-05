@@ -63,7 +63,10 @@ metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
 metagol_sn(Pos1,Neg1,MaxFPFrac,MaxDepth,SNT) :-
   maplist(atom_to_list,Pos1,Pos2),
   maplist(atom_to_list,Neg1,Neg2),
+  target_predicate(Pos2,P/A),
+  format('% learning ~w with step-wise narrowing\n',[P/A]),
   iterator(Clauses),
+  format('% clauses: ~d\n',[Clauses]),
   metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT)
   %, is_functional(Pos2,Sig,Prog)
   % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
@@ -87,6 +90,7 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
       SNT=snt(Prog,Phi,SNT2)
     )
   ).
+  
 
 % Phi mapping of predicate symbol
 phi_name(Orig,Exc) :- atomic_list_concat(['_',Orig],Exc).
@@ -108,7 +112,8 @@ learn_task(Pos/Neg,Prog):-
     learn(Pos,Neg,Prog),!,
     maplist(assert_clause,Prog),
     assert_prims(Prog).
-    
+
+
 proveall(Atoms,Sig,Prog):-
     target_predicate(Atoms,P/A),
     format('% learning ~w\n',[P/A]),

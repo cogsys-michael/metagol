@@ -14,6 +14,7 @@
     min_clauses/1,
     max_clauses/1,
     max_inv_preds/1,
+    false_positive_limit/1,
     metarule_next_id/1,
     interpreted_bk/2,
     user:prim/1,
@@ -29,10 +30,23 @@ default(min_clauses(1)).
 default(max_clauses(6)).
 default(metarule_next_id(1)).
 default(max_inv_preds(10)).
+default(false_positive_limit(0)).
 
 learn(Pos1,Neg1):-
-    learn(Pos1,Neg1,Prog),
+    learn_switch(Pos1,Neg1,Prog),
     pprint(Prog).
+    
+learn_switch(Pos,Neg,Prog) :- 
+  get_option(false_positive_limit(MaxFPOpt)),
+  length(Neg,NNeg), 
+  (integer(MaxFPOpt) -> 
+      MaxFP is min(max(0,MaxFPOpt),NNeg);
+      MaxFP is floor(min(max(0.0,MaxFPOpt),1.0)*NNeg)
+  ),  
+  (MaxFP=:=0 -> learn(Pos,Neg,Prog);
+    format('% Learning with up to ~d false positives~n', [MaxFP]),
+    metagol_relaxed(Pos,Neg,MaxFP,Prog,_TrueFP)
+  ).
     
 learn(Pos1,Neg1,Prog):-
   maplist(atom_to_list,Pos1,Pos2),

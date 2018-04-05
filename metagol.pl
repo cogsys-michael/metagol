@@ -1,6 +1,6 @@
 %% This is a copyrighted file under the BSD 3-clause licence, details of which can be found in the root directory.
 
-:- module(metagol,[learn/2,learn/3,learn_seq/2,metagol_relaxed/5,pprint/1,op(950,fx,'@')]).
+:- module(metagol,[learn/2,learn/3,learn_seq/2,metagol_relaxed/5,metagol_sn/5,pprint/1,pprint_snt/1,op(950,fx,'@')]).
 
 :- user:use_module(library(lists)).
 
@@ -53,7 +53,53 @@ metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
   proveall(Pos2,Sig,Prog),
   nprovemax(Neg2,Sig,Prog,MaxFP,TrueFP),
   is_functional(Pos2,Sig,Prog).
+  
+% metagol_sn(+Pos,+Neg,+MaxFPFrac,+MaxDepth,-SNT) 
+%
+% Learn a SNT from positive examples Pos and negative examples Neg. 
+% During learning, every theory holds for all positive examples and 
+% up to MaxFPFrac percent of negative examples.
+% The SNT has a maximal depth of MaxDepth.
+metagol_sn(Pos1,Neg1,MaxFPFrac,MaxDepth,SNT) :-
+  maplist(atom_to_list,Pos1,Pos2),
+  maplist(atom_to_list,Neg1,Neg2),
+  iterator(Clauses),
+  metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT)
+  %, is_functional(Pos2,Sig,Prog)
+  % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
+  .
 
+metagol_sn_([],_Neg1,_Clauses,_MaxFPFrac,_Depth,[]).
+metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
+  target_predicate(Pos1,P/A),
+  length(Neg1,NNeg), MaxFP is floor(NNeg * MaxFPFrac),
+  proveall_(Pos1,P/A,Clauses1,Sig,Prog),
+  nprovemax(Neg1,Sig,Prog,MaxFP,TrueFP,FalsePosList),
+  length(Prog,NProg),
+  (TrueFP==0 ->
+    SNT=Prog;
+    ( succ(NextDepth,Depth),
+      phi_name(P,Phi),
+      rename_examples(P,Phi,FalsePosList,Pos2),
+      rename_examples(P,Phi,Pos1,Neg2),
+      Clauses2 is Clauses1 - NProg,
+      metagol_sn_(Pos2,Neg2,Clauses2,MaxFPFrac,NextDepth,SNT2),
+      SNT=snt(Prog,Phi,SNT2)
+    )
+  ).
+
+% Phi mapping of predicate symbol
+phi_name(Orig,Exc) :- atomic_list_concat(['_',Orig],Exc).
+
+%rename_examples(_P,_Phi,[],[]).
+%rename_examples(P,Phi,[In|Ins],[Out|Outs]) :-
+%  rename_example(P,Phi,In,Out),
+%  rename_examples(P,Phi,Ins,Outs).
+rename_examples(P,Phi,In,Out) :- maplist(rename_example(P,Phi),In,Out).
+rename_example(P,Phi,[P|Args],[Phi|Args]).
+  
+
+  
 learn_seq(Seq,Prog):-
     maplist(learn_task,Seq,Progs),
     flatten(Progs,Prog).
@@ -62,14 +108,22 @@ learn_task(Pos/Neg,Prog):-
     learn(Pos,Neg,Prog),!,
     maplist(assert_clause,Prog),
     assert_prims(Prog).
-
+    
 proveall(Atoms,Sig,Prog):-
     target_predicate(Atoms,P/A),
     format('% learning ~w\n',[P/A]),
     iterator(MaxN),
     format('% clauses: ~d\n',[MaxN]),
-    invented_symbols(MaxN,P/A,Sig),
-    prove_examples(Atoms,Sig,_Sig,MaxN,0,_N,[],Prog).
+    proveall_(Atoms,P/A,MaxN,Sig,Prog).
+
+% proveall_(+Atoms,+P/A,+Clauses,-Sig,-Prog)
+% 
+% Prove all examples in Atoms allowing exactly 
+% Clauses clauses. Not all clauses might be used.
+% Examples are assumed to be for predicate P/A.
+proveall_(Atoms,P/A,Clauses,Sig,Prog):-
+    invented_symbols(Clauses,P/A,Sig),
+    prove_examples(Atoms,Sig,_Sig,Clauses,0,_N,[],Prog).
 
 prove_examples([],_FullSig,_Sig,_MaxN,N,N,Prog,Prog).
 prove_examples([Atom|Atoms],FullSig,Sig,MaxN,N1,N2,Prog1,Prog2):-
@@ -173,6 +227,24 @@ nprovemax([Atom|Atoms],PS,Prog,MaxFP,TrueFP) :-
     succ(MaxFP1,MaxFP), nprovemax(Atoms,PS,Prog,MaxFP1,TrueFP1), succ(TrueFP1,TrueFP);
     nprovemax(Atoms,PS,Prog,MaxFP,TrueFP).
 
+% nprovemax(+Atoms,+PS,+Prog,+MaxFP,-TrueFP,-FPs)
+% 
+% Tries to disprove all Atoms given the signature PS and
+% the current program Prog.
+% Succeeds if up to MaxFP atoms are proven. TrueNoise 
+% unifies with the number of proven atoms which are 
+% collected as a list in FPs.
+nprovemax(Atoms,PS,Prog,MaxFP,TrueFP,FPs) :- nprovemax_(Atoms,PS,Prog,MaxFP,FPs),
+  length(FPs,TrueFP).
+
+nprovemax_([],_PS,_Prog,_MaxFP,[]):- !.
+nprovemax_([Atom|Atoms],PS,Prog,MaxFP,Collection):-
+  (prove_deduce([Atom],PS,Prog) -> 
+    (succ(MaxFP1,MaxFP),Collection=[Atom|ColTail]); 
+    (MaxFP1=MaxFP,Collection=ColTail)
+  ),
+  nprovemax_(Atoms,PS,Prog,MaxFP1,ColTail).
+  
 
 iterator(N):-
     get_option(min_clauses(MinN)),
@@ -188,16 +260,40 @@ invented_symbols(MaxClauses,P/A,[sym(P,A,_U)|Sig]):-
     M is min(NumSymbols,MaxInvPreds),
     findall(sym(InvSym,_Artiy,_Used),(between(1,M,I),atomic_list_concat([P,'_',I],InvSym)),Sig).
 
+pprint_snt(SNT) :- pprint_snt(SNT,0).
+   
+pprint_snt(snt(Prog,Phi,SNT),Offset) :- !,
+    format('~*|<',[Offset]),
+    Offset2 is Offset + 2,
+    pprint(Prog,Offset2),
+    format('~*|, ~q, ~n',[Offset,Phi]),
+    pprint_snt(SNT,Offset2),
+    format('~*|>~n',[Offset]).
+    
+pprint_snt(Prog1,Offset) :- 
+    pprint(Prog1,Offset).
+    
 pprint(Prog1):-
     map_list_to_pairs(arg(2),Prog1,Pairs),
     keysort(Pairs,Sorted),
     pairs_values(Sorted,Prog2),
     maplist(pprint_clause,Prog2).
+    
+pprint(Prog1,Offset):-
+    map_list_to_pairs(arg(2),Prog1,Pairs),
+    keysort(Pairs,Sorted),
+    pairs_values(Sorted,Prog2),
+    maplist(pprint_clause(Offset),Prog2).
 
 pprint_clause(Sub):-
     construct_clause(Sub,Clause),
     numbervars(Clause,0,_),
     format('~q.~n',[Clause]).
+    
+pprint_clause(Offset,Sub):-
+    construct_clause(Sub,Clause),
+    numbervars(Clause,0,_),
+    format('~*|~q.~n',[Offset,Clause]).
 
 %% construct clause is horrible and needs refactoring
 construct_clause(sub(Name,_,_,MetaSub,_),Clause):-

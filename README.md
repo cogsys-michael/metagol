@@ -1,4 +1,5 @@
-Metagol is an inductive logic programming (ILP) system based on meta-interpretive learning. Please contact Andrew Cropper (andrew.cropper@cs.ox.ac.uk) with any questions / bugs. If you use Metagol for research, please use [this citation](https://raw.githubusercontent.com/metagol/metagol/master/metagol.bib) or cite the relevant paper.
+Metagol is an inductive logic programming (ILP) system based on meta-interpretive learning. In this branch we develop the version Metagol_SN which allows to induce an over-general theory and another theory to restrict the first. Please contact Michael Siebers (michael.siebers@uni-bamberg.de) with any questions / bugs. 
+If you use Metagol for research, please use [this citation](https://raw.githubusercontent.com/metagol/metagol/master/metagol.bib) or cite the relevant paper.
 
 #### Using Metagol
 

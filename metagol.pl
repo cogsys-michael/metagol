@@ -1,6 +1,8 @@
 %% This is a copyrighted file under the BSD 3-clause licence, details of which can be found in the root directory.
 
-:- module(metagol,[learn/2,learn/3,learn_seq/2,metagol_relaxed/5,metagol_sn/5,pprint/1,pprint_snt/1,op(950,fx,'@')]).
+:- module(metagol,[learn/2,learn/3,learn_seq/2,
+                   metagol_relaxed/5,metagol_sn/4,pprint_snt/1,
+                   pprint/1,op(950,fx,'@')]).
 
 :- user:use_module(library(lists)).
 
@@ -14,6 +16,7 @@
     min_clauses/1,
     max_clauses/1,
     max_inv_preds/1,
+    max_fp_frac/1,
     metarule_next_id/1,
     interpreted_bk/2,
     user:prim/1,
@@ -29,6 +32,7 @@ default(min_clauses(1)).
 default(max_clauses(6)).
 default(metarule_next_id(1)).
 default(max_inv_preds(10)).
+default(max_fp_frac(0.10)).
 
 learn(Pos1,Neg1):-
     learn(Pos1,Neg1,Prog),
@@ -58,19 +62,23 @@ metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
 %
 % Learn a SNT from positive examples Pos and negative examples Neg. 
 % During learning, every theory holds for all positive examples and 
-% up to MaxFPFrac percent of negative examples.
+% up to max_fp_frac/1 percent of negative examples.
 % The SNT has a maximal depth of MaxDepth.
-metagol_sn(Pos1,Neg1,MaxFPFrac,MaxDepth,SNT) :-
-  maplist(atom_to_list,Pos1,Pos2),
-  maplist(atom_to_list,Neg1,Neg2),
-  target_predicate(Pos2,P/A),
-  format('% learning ~w with step-wise narrowing\n',[P/A]),
-  iterator(Clauses),
-  format('% clauses: ~d\n',[Clauses]),
-  metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT)
+metagol_sn(Pos1,Neg1,MaxDepth,SNT) :-
+  get_option(max_fp_frac(MaxFPFracOpt)),
+  MaxFPFrac is min(max(0.0,MaxFPFracOpt),1.0),
+  (MaxFPFrac =:= 0 -> 
+    learn(Pos1,Neg1,SNT); 
+    maplist(atom_to_list,Pos1,Pos2),
+    maplist(atom_to_list,Neg1,Neg2),
+    target_predicate(Pos2,P/A),
+    format('% learning ~w using step-wise narrowing\n%   max false positive fraction: ~f\n%   max depth: ~d\n',[P/A, MaxFPFrac,MaxDepth]),
+    iterator(Clauses),
+    format('% clauses: ~d\n',[Clauses]),
+    metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT)
   %, is_functional(Pos2,Sig,Prog)
   % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
-  .
+ ).
 
 metagol_sn_([],_Neg1,_Clauses,_MaxFPFrac,_Depth,[]).
 metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
@@ -90,7 +98,6 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
       SNT=snt(Prog,Phi,SNT2)
     )
   ).
-  
 
 % Phi mapping of predicate symbol
 phi_name(Orig,Exc) :- atomic_list_concat(['_',Orig],Exc).
@@ -129,7 +136,8 @@ proveall(Atoms,Sig,Prog):-
 proveall_(Atoms,P/A,Clauses,Sig,Prog):-
     invented_symbols(Clauses,P/A,Sig),
     prove_examples(Atoms,Sig,_Sig,Clauses,0,_N,[],Prog).
-
+    
+    
 prove_examples([],_FullSig,_Sig,_MaxN,N,N,Prog,Prog).
 prove_examples([Atom|Atoms],FullSig,Sig,MaxN,N1,N2,Prog1,Prog2):-
     prove_deduce([Atom],FullSig,Prog1),!,

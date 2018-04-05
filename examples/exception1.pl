@@ -22,11 +22,12 @@ metarule([P,Q,R],([P,A]:-[[Q,A],[R,A]])).
 
 metagol:min_clauses(1).
 metagol:max_clauses(4).
+metagol:max_fp_frac(0.10).
 
 %% 
 a(Progs) :-
   examples(4,400,Pos,Neg),
-  metagol_sn(Pos,Neg,0.10,3,Progs).
+  metagol_sn(Pos,Neg,3,Progs).
 
 a :- a(Progs), pprint_snt(Progs).
 

@@ -12,7 +12,7 @@ metarule([P, Q, R], ([P, A, B]:-[[Q, A], [R, B]])).
 %% background knowledge
 even(X) :- X mod 2 =:= 0.
 
-
+metagol:max_fp_frac(0.50).
 
 a(Progs) :-
   Pos = [
@@ -33,6 +33,6 @@ a(Progs) :-
     xor(4,8),
     xor(3,7)
     ],
-  metagol_sn(Pos,Neg,0.5,3,Progs).
+  metagol_sn(Pos,Neg,3,Progs).
   
 a :- a(Progs), pprint_snt(Progs).

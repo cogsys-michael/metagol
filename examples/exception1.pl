@@ -25,12 +25,10 @@ metagol:max_clauses(4).
 metagol:max_fp_frac(0.10).
 
 %% 
-a(Progs) :-
+a:-
   examples(4,400,Pos,Neg),
-  metagol_sn(Pos,Neg,3,Progs).
-
-a :- a(Progs), pprint_snt(Progs).
-
+  metagol_sn(Pos,Neg,3,Progs),
+  pprint(Progs).
   
 leap_year(Y) :- divisible(Y,4), 
   (divisible(Y,100) -> divisible(Y,400) ; true).

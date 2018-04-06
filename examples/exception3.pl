@@ -14,7 +14,7 @@ even(X) :- X mod 2 =:= 0.
 
 metagol:max_fp_frac(0.50).
 
-a(Progs) :-
+a :-
   Pos = [
     xor(1,2),
     xor(1,4),
@@ -33,6 +33,5 @@ a(Progs) :-
     xor(4,8),
     xor(3,7)
     ],
-  metagol_sn(Pos,Neg,3,Progs).
-  
-a :- a(Progs), pprint_snt(Progs).
+  metagol_sn(Pos,Neg,3,Progs),
+  pprint(Progs).

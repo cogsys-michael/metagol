@@ -20,7 +20,8 @@
     metarule_next_id/1,
     interpreted_bk/2,
     user:prim/1,
-    user:primcall/2.
+    user:primcall/2,
+    user:metarule_init/6.
 
 :- discontiguous
     user:metarule/7,
@@ -58,24 +59,25 @@ metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
   nprovemax(Neg2,Sig,Prog,MaxFP,TrueFP),
   is_functional(Pos2,Sig,Prog).
   
-% metagol_sn(+Pos,+Neg,+MaxFPFrac,+MaxDepth,-SNT) 
+% metagol_sn(+Pos,+Neg,+MaxDepth,-Prog) 
 %
-% Learn a SNT from positive examples Pos and negative examples Neg. 
+% Learn a flattened SNT from positive examples Pos and negative examples Neg. 
 % During learning, every theory holds for all positive examples and 
 % up to max_fp_frac/1 percent of negative examples.
 % The SNT has a maximal depth of MaxDepth.
-metagol_sn(Pos1,Neg1,MaxDepth,SNT) :-
+metagol_sn(Pos1,Neg1,MaxDepth,Prog) :-
   get_option(max_fp_frac(MaxFPFracOpt)),
   MaxFPFrac is min(max(0.0,MaxFPFracOpt),1.0),
   (MaxFPFrac =:= 0 -> 
-    learn(Pos1,Neg1,SNT); 
+    learn(Pos1,Neg1,Prog); 
     maplist(atom_to_list,Pos1,Pos2),
     maplist(atom_to_list,Neg1,Neg2),
     target_predicate(Pos2,P/A),
     format('% learning ~w using step-wise narrowing\n%   max false positive fraction: ~f\n%   max depth: ~d\n',[P/A, MaxFPFrac,MaxDepth]),
     iterator(Clauses),
     format('% clauses: ~d\n',[Clauses]),
-    metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT)
+    metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT),
+    flatten_snt(P/A,SNT,Prog)
   %, is_functional(Pos2,Sig,Prog)
   % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
  ).
@@ -99,6 +101,33 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
     )
   ).
 
+  
+% flatten_snt(+TargetP/+Arity,+Progs,-Prog)
+% 
+% Flattens a SNT theory to a single theory.
+flatten_snt(P/A,snt(Prog,Phi,SNT2),FlatProg) :- !,
+  flatten_snt(Phi/A,SNT2,FlatProg2),
+  flatten_snt_(Prog,P,Phi,Prog3),
+  append(Prog3,FlatProg2,FlatProg).  
+flatten_snt(_,Prog,Prog).
+
+
+% flatten_snt_(+Program,+TargetPredicate,+PhiPred,-ExceptProgram)
+%
+% Takes a Program from an SNT where PhiPred holds the name of the inner predicate.
+% Every subprogram for TargetPredicate is changed such that it incorporates the negation of PhiPred as last literal.
+% Necessary metarule_init/6's are asserted.
+flatten_snt_([],_TargetP,_Phi,[]).
+flatten_snt_([sub(Name,P,A,MetaSub,PredTypes)|Progs],TargetP,ExceptionP,[sub(Name,P,A,MetaSub,PredTypes)|ExceptProgs]) :-
+  P \= TargetP, flatten_snt_(Progs,TargetP,ExceptionP,ExceptProgs).
+flatten_snt_([sub(Name1,TargetP,A,MetaSub1,PredTypes1)|Progs],TargetP,ExceptionP,[sub(Name2,TargetP,A,MetaSub2,PredTypes2)|ExceptProgs]) :-
+  atomic_concat('snt$',Name1,Name2),
+  append(MetaSub1,[ExceptionP],MetaSub2),
+  append(PredTypes1,[exc],PredTypes2),
+  assert_snt_metarule_init(Name1,Name2),
+  flatten_snt_(Progs,TargetP,ExceptionP,ExceptProgs).
+
+
 % Phi mapping of predicate symbol
 phi_name(Orig,Exc) :- atomic_list_concat(['_',Orig],Exc).
 
@@ -110,6 +139,16 @@ rename_examples(P,Phi,In,Out) :- maplist(rename_example(P,Phi),In,Out).
 rename_example(P,Phi,[P|Args],[Phi|Args]).
   
 
+assert_snt_metarule_init(Name1,Name2) :-
+  user:metarule_init(Name2,_MetaSub,_PredTypes,_Clause,_Recursive,_Path) 
+    -> true;
+    metarule_init(Name1,MetaSub1,PredTypes1,(Head:-Body1),Recursive,Path),
+    append(MetaSub1,[ExcP],MetaSub2),
+    append(PredTypes1,[exc],PredTypes2),
+    Head = [_P|Args], length(Args,Arity),
+    append(Body1,[p(exc, ExcP, Arity, Args, [ExcP|Args], Path)],Body2),
+    Metarule = user:metarule_init(Name2,MetaSub2,PredTypes2,(Head:-Body2),Recursive,Path),
+    assertz(Metarule).
   
 learn_seq(Seq,Prog):-
     maplist(learn_task,Seq,Progs),
@@ -189,6 +228,8 @@ prove_aux(p(inv,P,A,_Args,Atom,Path),FullSig,Sig1,MaxN,N1,N2,Prog1,Prog2):-
     check_new_metasub(Name,P,A,MetaSub,Prog1),
     succ(N1,N3),
     prove(Body1,FullSig,Sig2,MaxN,N3,N2,[sub(Name,P,A,MetaSub,PredTypes)|Prog1],Prog2).
+    
+
 
 add_empty_path([P|Args],p(inv,P,A,Args,[P|Args],[])):-
     size(Args,A).
@@ -323,10 +364,14 @@ atomsaslists_to_atoms([],[]).
 atomsaslists_to_atoms(['@'(Atom)|T1],Out):- !,
     (get_option(print_ordering) -> Out=[Atom|T2]; Out=T2),
     atomsaslists_to_atoms(T1,T2).
-atomsaslists_to_atoms([AtomAsList|T1],[Atom|T2]):-
-    atom_to_list(Atom,AtomAsList),
+atomsaslists_to_atoms([AtomAsList|T1],[Atom|T2]) :-
+    (AtomAsList = \+(InnerAtomAsList) 
+      -> atom_to_list(InnerAtom,InnerAtomAsList), Atom = \+(InnerAtom)
+      ; atom_to_list(Atom,AtomAsList)
+    ),
     atomsaslists_to_atoms(T1,T2).
-
+    
+    
 list_to_clause([Atom],Atom):-!.
 list_to_clause([Atom|T1],(Atom,T2)):-!,
     list_to_clause(T1,T2).
@@ -404,7 +449,8 @@ is_recursive([_|T],P,Res):-
 add_path_to_body([],_Path,[],[]).
 add_path_to_body(['@'(Atom)|Atoms],Path,['@'(Atom)|Rest],Out):-
     add_path_to_body(Atoms,Path,Rest,Out).
-add_path_to_body([[P|Args]|Atoms],Path,[p(PType,P,A,Args,[P|Args],Path)|Rest],[PType|Out]):-
+add_path_to_body([Atom|Atoms],Path,[p(PType,P,A,Args,[P|Args],Path)|Rest],[PType|Out]):-
+    (PType == exc -> Atom= \+([P|Args]) ; Atom=[P|Args]),
     size(Args,A),
     add_path_to_body(Atoms,Path,Rest,Out).
 

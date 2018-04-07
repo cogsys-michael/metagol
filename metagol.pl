@@ -96,8 +96,10 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
       rename_examples(P,Phi,FalsePosList,Pos2),
       rename_examples(P,Phi,Pos1,Neg2),
       Clauses2 is Clauses1 - NProg,
-      metagol_sn_(Pos2,Neg2,Clauses2,MaxFPFrac,NextDepth,SNT2),
-      SNT=snt(Prog,Phi,SNT2)
+      setup_call_cleanup(
+        assert_program(Prog,Refs),
+        (metagol_sn_(Pos2,Neg2,Clauses2,MaxFPFrac,NextDepth,SNT2), SNT=snt(Prog,Phi,SNT2)),
+        maplist(erase,Refs))
     )
   ).
 
@@ -126,8 +128,8 @@ flatten_snt_([sub(Name1,TargetP,A,MetaSub1,PredTypes1)|Progs],TargetP,ExceptionP
   append(PredTypes1,[exc],PredTypes2),
   assert_snt_metarule_init(Name1,Name2),
   flatten_snt_(Progs,TargetP,ExceptionP,ExceptProgs).
-
-
+  
+  
 % Phi mapping of predicate symbol
 phi_name(Orig,Exc) :- atomic_list_concat(['_',Orig],Exc).
 
@@ -149,7 +151,7 @@ assert_snt_metarule_init(Name1,Name2) :-
     append(Body1,[p(exc, ExcP, Arity, Args, [ExcP|Args], Path)],Body2),
     Metarule = user:metarule_init(Name2,MetaSub2,PredTypes2,(Head:-Body2),Recursive,Path),
     assertz(Metarule).
-  
+
 learn_seq(Seq,Prog):-
     maplist(learn_task,Seq,Progs),
     flatten(Progs,Prog).
@@ -469,7 +471,26 @@ assert_prims(Prog):-
 assert_prim(Prim):-
     prim_asserts(Prim,Asserts),
     maplist(assertz,Asserts).
-
+    
+assert_program(Prog,Refs):-
+    maplist(assert_clause,Prog,Ref1),
+    assert_prims(Prog,Ref2),
+    append(Ref1,Ref2,Refs).
+    
+assert_clause(Sub,Ref):-
+    construct_clause(Sub,Clause),
+    assert(user:Clause,Ref).
+    
+assert_prims(Prog,Refs):-
+    findall(P/A,(member(sub(_Name,P,A,_MetaSub,_PredTypes),Prog)),Prims),!,
+    list_to_set(Prims,PrimSet),
+    maplist(assert_prim,PrimSet,Refss),
+    flatten(Refss,Refs).
+    
+assert_prim(Prim,Refs):-
+    prim_asserts(Prim,Asserts),
+    maplist(assertz,Asserts,Refs).
+    
 prim_asserts(P/A,[user:prim(P/A), user:(primcall(P,Args):-user:Call)]):-
     functor(Call,P,A),
     Call =.. [P|Args].

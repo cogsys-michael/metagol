@@ -1,7 +1,7 @@
 %% This is a copyrighted file under the BSD 3-clause licence, details of which can be found in the root directory.
 
 :- module(metagol,[learn/2,learn/3,learn_seq/2,
-                   metagol_relaxed/5,metagol_sn/4,pprint_snt/1,
+                   metagol_relaxed/5,metagol_sn/5,pprint_snt/1,
                    pprint/1,op(950,fx,'@')]).
 
 :- user:use_module(library(lists)).
@@ -64,12 +64,12 @@ metagol_relaxed(Pos1,Neg1,MaxFP,Prog,TrueFP) :-
 % Learn a flattened SNT from positive examples Pos and negative examples Neg. 
 % During learning, every theory holds for all positive examples and 
 % up to max_fp_frac/1 percent of negative examples.
-% The SNT has a maximal depth of MaxDepth.
-metagol_sn(Pos1,Neg1,MaxDepth,Prog) :-
+% The SNT has a maximal depth of MaxDepth. Depth unifies with the depth of the learned SNT.
+metagol_sn(Pos1,Neg1,MaxDepth,Depth,Prog) :-
   get_option(max_fp_frac(MaxFPFracOpt)),
   MaxFPFrac is min(max(0.0,MaxFPFracOpt),1.0),
   (MaxFPFrac =:= 0 -> 
-    learn(Pos1,Neg1,Prog); 
+    learn(Pos1,Neg1,Prog), Depth=0; 
     maplist(atom_to_list,Pos1,Pos2),
     maplist(atom_to_list,Neg1,Neg2),
     target_predicate(Pos2,P/A),
@@ -77,6 +77,7 @@ metagol_sn(Pos1,Neg1,MaxDepth,Prog) :-
     iterator(Clauses),
     format('% clauses: ~d\n',[Clauses]),
     metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT),
+    snt_depth(SNT,Depth),
     flatten_snt(P/A,SNT,Prog)
   %, is_functional(Pos2,Sig,Prog)
   % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
@@ -103,6 +104,9 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
     )
   ).
 
+snt_depth(snt(_,_,SNT2), D1) :-
+    !, snt_depth(SNT2,D0), succ(D0,D1).
+snt_depth(_,0).
   
 % flatten_snt(+TargetP/+Arity,+Progs,-Prog)
 % 

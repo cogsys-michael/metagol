@@ -33,5 +33,5 @@ a :-
     xor(4,8),
     xor(3,7)
     ],
-  metagol_sn(Pos,Neg,3,Progs),
+  metagol_sn(Pos,Neg,3,_,Progs),
   pprint(Progs).

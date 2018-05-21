@@ -78,12 +78,11 @@ metagol_sn(Pos1,Neg1,MaxDepth,Depth,Prog) :-
     format('% clauses: ~d\n',[Clauses]),
     metagol_sn_(Pos2,Neg2,Clauses,MaxFPFrac,MaxDepth,SNT),
     snt_depth(SNT,Depth),
-    flatten_snt(P/A,SNT,Prog)
-  %, is_functional(Pos2,Sig,Prog)
-  % Functional can only be relevant for the complete list of theories. The check is not implemented yet.
+    flatten_snt(P/A,SNT,Prog-Sig),
+    is_functional(Pos2,Sig,Prog)
  ).
 
-metagol_sn_([],_Neg1,_Clauses,_MaxFPFrac,_Depth,[]).
+metagol_sn_([],_Neg1,_Clauses,_MaxFPFrac,_Depth,[]-[]).
 metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
   target_predicate(Pos1,P/A),
   length(Neg1,NNeg), MaxFP is floor(NNeg * MaxFPFrac),
@@ -91,7 +90,7 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
   nprovemax(Neg1,Sig,Prog,MaxFP,TrueFP,FalsePosList),
   length(Prog,NProg),
   (TrueFP==0 ->
-    SNT=Prog;
+    SNT=Prog-Sig;
     ( succ(NextDepth,Depth),
       phi_name(P,Phi),
       rename_examples(P,Phi,FalsePosList,Pos2),
@@ -99,7 +98,7 @@ metagol_sn_(Pos1,Neg1,Clauses1,MaxFPFrac,Depth,SNT) :-
       Clauses2 is Clauses1 - NProg,
       setup_call_cleanup(
         assert_program(Prog,Refs),
-        (metagol_sn_(Pos2,Neg2,Clauses2,MaxFPFrac,NextDepth,SNT2), SNT=snt(Prog,Phi,SNT2)),
+        (metagol_sn_(Pos2,Neg2,Clauses2,MaxFPFrac,NextDepth,SNT2), SNT=snt(Prog-Sig,Phi,SNT2)),
         maplist(erase,Refs))
     )
   ).
@@ -108,13 +107,14 @@ snt_depth(snt(_,_,SNT2), D1) :-
     !, snt_depth(SNT2,D0), succ(D0,D1).
 snt_depth(_,0).
   
-% flatten_snt(+TargetP/+Arity,+Progs,-Prog)
+% flatten_snt(+TargetP/+Arity,+SNT,-Prog-Sig)
 % 
 % Flattens a SNT theory to a single theory.
-flatten_snt(P/A,snt(Prog,Phi,SNT2),FlatProg) :- !,
-  flatten_snt(Phi/A,SNT2,FlatProg2),
+flatten_snt(P/A,snt(Prog-Sig,Phi,SNT2),FlatProg-FlatSig) :- !,
+  flatten_snt(Phi/A,SNT2,FlatProg2-FlatSig2),
   flatten_snt_(Prog,P,Phi,Prog3),
-  append(Prog3,FlatProg2,FlatProg).  
+  append(Prog3,FlatProg2,FlatProg),
+  append(Sig,FlatSig2,FlatSig).  
 flatten_snt(_,Prog,Prog).
 
 
@@ -322,7 +322,7 @@ invented_symbols(MaxClauses,P/A,[sym(P,A,_U)|Sig]):-
 
 pprint_snt(SNT) :- pprint_snt(SNT,0).
    
-pprint_snt(snt(Prog,Phi,SNT),Offset) :- !,
+pprint_snt(snt(Prog-_Sig,Phi,SNT),Offset) :- !,
     format('~*|<',[Offset]),
     Offset2 is Offset + 2,
     pprint(Prog,Offset2),
@@ -330,7 +330,7 @@ pprint_snt(snt(Prog,Phi,SNT),Offset) :- !,
     pprint_snt(SNT,Offset2),
     format('~*|>~n',[Offset]).
     
-pprint_snt(Prog1,Offset) :- 
+pprint_snt(Prog1-_Sig,Offset) :- 
     pprint(Prog1,Offset).
     
 pprint(Prog1):-

@@ -1,6 +1,7 @@
 :- use_module('../metagol').
 
 %% background knowledge
+% This is background knowledge B_div
 divisible(X,Y) :- nonvar(X), nonvar(Y), !, X mod Y =:= 0.
 divisible(X,Y) :- nonvar(X), var(Y), 
   SQRT is sqrt(X), 
@@ -34,12 +35,13 @@ examples(From,To,Pos,Neg) :-
   findall(leapyear(N),(between(From,To,N), leapyear(N)), Pos),
   findall(leapyear(N),(between(From,To,N), \+(leapyear(N))), Neg).
 
+% use Metagol_SN
 a:-
   examples(4,400,Pos,Neg),
   metagol_sn(Pos,Neg,3,_Depth,Progs),
   pprint(Progs).
   
-% 'classical' Metagol will fail on this task
+% Metagol_AI will fail on this task
 b:-
   examples(4,400,Pos,Neg),
   learn(Pos,Neg).

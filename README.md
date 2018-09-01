@@ -1,5 +1,10 @@
-Metagol is an inductive logic programming (ILP) system based on meta-interpretive learning. In this branch we develop the version Metagol_SN which allows to induce an over-general theory and another theory to restrict the first. Please contact Michael Siebers (michael.siebers@uni-bamberg.de) with any questions / bugs. 
-If you use Metagol for research, please use [this citation](https://raw.githubusercontent.com/metagol/metagol/master/metagol.bib) or cite the relevant paper.
+Metagol is an inductive logic programming (ILP) system based on meta-interpretive learning. In this branch we present the Metagol_SN version as presented at ILP 2018. Metagol_SN allows to induce an over-general theory and another theory to restrict the first. Details on Metagol_SN can be found in
+
+> Siebers M., Schmid U. (2018) Was the Year 2000 a Leap Year? Step-Wise Narrowing Theories with Metagol. In: ILP 2018. LNCS, vol 11105. Springer.
+
+If you use Metagol_SN for research, please cite this paper (see also [bibtex](metagol.bib)). Please contact Michael Siebers (michael.siebers@uni-bamberg.de) with any questions / bugs. 
+
+In this branch, the main program `metagol.pl` and examples `leapyear1.pl` and `leapyear2.pl` have been augmented with comments referencing pseudo-code and experiments in this paper.
 
 
 ### Using Metagol_SN

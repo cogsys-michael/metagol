@@ -16,7 +16,7 @@
     min_clauses/1,
     max_clauses/1,
     max_inv_preds/1,
-    max_fp_frac/1,
+    max_fp_frac/1, % this parameter models the `maximal false positive fraction`
     metarule_next_id/1,
     interpreted_bk/2,
     user:prim/1,
@@ -39,6 +39,7 @@ learn(Pos1,Neg1):-
     learn(Pos1,Neg1,Prog),
     pprint(Prog).
     
+% in the paper, this predicate is called `metagol`
 learn(Pos1,Neg1,Prog):-
   maplist(atom_to_list,Pos1,Pos2),
   maplist(atom_to_list,Neg1,Neg2),
@@ -110,6 +111,9 @@ snt_depth(_,0).
 % flatten_snt(+TargetP/+Arity,+SNT,-Prog-Sig)
 % 
 % Flattens a SNT theory to a single theory.
+% CAVE: This predicate implements SNT flattening as described in the paper. 
+%       However,this flattening technique is only correct if no 
+%       clause for the target predicate is recursive. 
 flatten_snt(P/A,snt(Prog-Sig,Phi,SNT2),FlatProg-FlatSig) :- !,
   flatten_snt(Phi/A,SNT2,FlatProg2-FlatSig2),
   flatten_snt_(Prog,P,Phi,Prog3),
@@ -165,7 +169,7 @@ learn_task(Pos/Neg,Prog):-
     maplist(assert_clause,Prog),
     assert_prims(Prog).
 
-
+% in the paper integrated in `metagol`
 proveall(Atoms,Sig,Prog):-
     target_predicate(Atoms,P/A),
     format('% learning ~w\n',[P/A]),
@@ -181,8 +185,8 @@ proveall(Atoms,Sig,Prog):-
 proveall_(Atoms,P/A,Clauses,Sig,Prog):-
     invented_symbols(Clauses,P/A,Sig),
     prove_examples(Atoms,Sig,_Sig,Clauses,0,_N,[],Prog).
-    
-    
+
+% `prove_all` in the paper
 prove_examples([],_FullSig,_Sig,_MaxN,N,N,Prog,Prog).
 prove_examples([Atom|Atoms],FullSig,Sig,MaxN,N1,N2,Prog1,Prog2):-
     prove_deduce([Atom],FullSig,Prog1),!,
@@ -203,21 +207,25 @@ prove([Atom|Atoms],FullSig,Sig,MaxN,N1,N2,Prog1,Prog2):-
     prove_aux(Atom,FullSig,Sig,MaxN,N1,N3,Prog1,Prog3),
     prove(Atoms,FullSig,Sig,MaxN,N3,N2,Prog3,Prog2).
 
+% Ordering constraints are omitted in the paper
 prove_aux('@'(Atom),_FullSig,_Sig,_MaxN,N,N,Prog,Prog):-!,
     user:call(Atom).
 
 %% prove primitive atom
+% `prove_one` in the paper
 prove_aux(p(prim,P,_A,Args,_,_Path),_FullSig,_Sig,_MaxN,N,N,Prog,Prog):-
     user:primcall(P,Args).
 
 %% use interpreted BK - can we skip this if no interpreted_bk?
 %% only works if interpreted/2 is below the corresponding definition
+% interpreted background knowledge omitted in the paper
 prove_aux(p(inv,_P,_A,_Args,Atom,Path),FullSig,Sig,MaxN,N1,N2,Prog1,Prog2):-
     interpreted_bk(Atom,Body1),
     add_path_to_body(Body1,[Atom|Path],Body2,_),
     prove(Body2,FullSig,Sig,MaxN,N1,N2,Prog1,Prog2).
 
 %% use existing abduction
+% `prove_one` in the paper
 prove_aux(p(inv,P,A,_Args,Atom,Path),FullSig,Sig1,MaxN,N1,N2,Prog1,Prog2):-
     select_lower(P,A,FullSig,Sig1,Sig2),
     member(sub(Name,P,A,MetaSub,PredTypes),Prog1),
@@ -226,6 +234,7 @@ prove_aux(p(inv,P,A,_Args,Atom,Path),FullSig,Sig1,MaxN,N1,N2,Prog1,Prog2):-
     prove(Body1,FullSig,Sig2,MaxN,N1,N2,Prog1,Prog2).
 
 %% new abduction
+% `prove_one` in the paper
 prove_aux(p(inv,P,A,_Args,Atom,Path),FullSig,Sig1,MaxN,N1,N2,Prog1,Prog2):-
     (N1 == MaxN -> fail; true),
     bind_lower(P,A,FullSig,Sig1,Sig2),
@@ -269,6 +278,7 @@ size([_,_,_],3) :-!.
 size(L,N):- !,
   length(L,N).
 
+% `prove_none` in the paper
 nproveall([],_PS,_Prog):- !.
 nproveall([Atom|Atoms],PS,Prog):-
     \+ prove_deduce([Atom],PS,Prog),
@@ -280,6 +290,7 @@ nproveall([Atom|Atoms],PS,Prog):-
 % the current program Prog.
 % Succeeds if up to MaxFP atoms are proven. TrueFP 
 % unifies with the number of proven atoms.
+% `prove_some` in the paper
 nprovemax([],_PS,_Prog,_MaxFP,0) :- !.
 nprovemax(Atoms,PS,Prog,0,0) :- nproveall(Atoms,PS,Prog), !.
 nprovemax([Atom|Atoms],PS,Prog,MaxFP,TrueFP) :-
@@ -294,6 +305,7 @@ nprovemax([Atom|Atoms],PS,Prog,MaxFP,TrueFP) :-
 % Succeeds if up to MaxFP atoms are proven. TrueNoise 
 % unifies with the number of proven atoms which are 
 % collected as a list in FPs.
+% `prove_some` in the paper
 nprovemax(Atoms,PS,Prog,MaxFP,TrueFP,FPs) :- nprovemax_(Atoms,PS,Prog,MaxFP,FPs),
   length(FPs,TrueFP).
 

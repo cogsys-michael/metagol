@@ -1,6 +1,9 @@
 :- use_module('../metagol').
 
 %% background knowledge
+% This is equivalent to B_max described in the paper.
+% Please note that possible dividers were computed as
+% pre-processing step in the experiments.
 known_divider(1).
 known_divider(2).
 known_divider(4).
@@ -40,6 +43,7 @@ metarule([P,Q,R],([P,A]:-[[Q,A],[R,A]])).
 %% parameters
 metagol:max_fp_frac(0.67).
 
+% use Metagol_SN
 a :-
   % positive examples
   Pos = [
@@ -56,6 +60,7 @@ a :-
   metagol_sn(Pos,Neg,3,_,Progs),
   pprint(Progs).
   
+% use Metagol_AI
 b:-
   Pos = [
     leapyear(400),

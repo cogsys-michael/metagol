@@ -1,7 +1,83 @@
 Metagol is an inductive logic programming (ILP) system based on meta-interpretive learning. In this branch we develop the version Metagol_SN which allows to induce an over-general theory and another theory to restrict the first. Please contact Michael Siebers (michael.siebers@uni-bamberg.de) with any questions / bugs. 
 If you use Metagol for research, please use [this citation](https://raw.githubusercontent.com/metagol/metagol/master/metagol.bib) or cite the relevant paper.
 
-#### Using Metagol
+
+### Using Metagol_SN
+
+Metagol_SN is written in Prolog and runs with SWI. Though YAP is supported by the [original Metagol](https://github.com/metagol/metagol), Metagol_SN has not been tested in YAP. The following code demonstrates using Metagol_SN to learn a half-sibling relation. [#using-metagol](Below) you find a general introduction to Metagol.
+
+```prolog
+:- use_module('metagol').
+
+%% background knowledge
+% alice and bob sired charles and diana
+% eve and bob sired frank and greg
+% alice and hank sired ida and john
+mother(alice, charles).
+mother(alice, diana).
+mother(alice, ida).
+mother(alice, john).
+mother(eve, frank).
+mother(eve, greg).
+
+father(bob, charles).
+father(bob, diana).
+father(bob, frank).
+father(bob, greg).
+father(hank, ida).
+father(hank, john).
+
+%% predicates that can be used in the learning
+prim(mother/2).
+prim(father/2).
+prim((=)/2).
+
+%% metarules
+metarule([P,Q],([P,A,B]:-[[Q,A,B]])).
+metarule([P,Q],([P,A,B]:-[[Q,C,A],[Q,C,B]])).
+metarule([P,Q,R],([P,A,B]:-[[Q,A,B],[R,A,B]])).
+
+%% parameters
+metagol:max_fp_frac(0.25).
+
+a :-
+  %% positive examples
+  Pos = [ 
+    half_sib(diana,frank),
+    half_sib(diana,charles),
+    half_sib(ida,john),
+    half_sib(greg,charles),
+    half_sib(diana,john),
+    half_sib(john,charles),
+    half_sib(charles,john)
+  ],
+  %% negative examples
+  Neg = [
+    half_sib(diana,alice),
+    half_sib(ida,ida),
+    half_sib(john,frank),
+    half_sib(greg,bob)
+  ],
+  metagol_sn(Pos,Neg,1,_Depth,Progs),
+  pprint(Progs).
+
+```
+The maximal allowed false positive fraction is set using `metagol:max_fp_frac/2`. As there are only 4 negative examples, we set the value to 25% to allow at least one false positive example. Running the above program will print the output:
+
+```prolog
+% learning half_sib/2 using step-wise narrowing
+%   max false positive fraction: 0.250000
+%   max depth: 1
+% clauses: 1
+% clauses: 2
+% clauses: 3
+'_half_sib'(A,B):-A=B.
+half_sib(A,B):-mother(C,A),mother(C,B),\+'_half_sib'(A,B).
+half_sib(A,B):-father(C,A),father(C,B),\+'_half_sib'(A,B).
+```
+
+
+### Using Metagol
 
 Metagol is written in Prolog and runs with both Yap and SWI. The following code demonstrates learning the grandparent relation given the mother and father relations as background knowledge:
 

@@ -1,5 +1,4 @@
 :- use_module('../metagol').
-:- use_module(library(apply)).
 
 %% background knowledge
 divisible(X,Y) :- nonvar(X), nonvar(Y), !, X mod Y =:= 0.
@@ -20,19 +19,27 @@ prim(divisible/2).
 metarule([P,Q,B],([P,A]:-[[Q,A,B]])).
 metarule([P,Q,R],([P,A]:-[[Q,A],[R,A]])).
 
-metagol:min_clauses(1).
-metagol:max_clauses(4).
+%% parameters
 metagol:max_fp_frac(0.10).
+metagol:max_clauses(5).
 
 %% 
-a:-
-  examples(4,400,Pos,Neg),
-  metagol_sn(Pos,Neg,3,_,Progs),
-  pprint(Progs).
-  
-leap_year(Y) :- divisible(Y,4), 
+% target predicate
+leapyear(Y) :- divisible(Y,4), 
   (divisible(Y,100) -> divisible(Y,400) ; true).
 
+% separate years from From to To into positive and 
+% negative examples for leap_year/1 
 examples(From,To,Pos,Neg) :-
-  findall(leapyear(N),(between(From,To,N), leap_year(N)), Pos),
-  findall(leapyear(N),(between(From,To,N), \+(leap_year(N))), Neg).
+  findall(leapyear(N),(between(From,To,N), leapyear(N)), Pos),
+  findall(leapyear(N),(between(From,To,N), \+(leapyear(N))), Neg).
+
+a:-
+  examples(4,400,Pos,Neg),
+  metagol_sn(Pos,Neg,3,_Depth,Progs),
+  pprint(Progs).
+  
+% 'classical' Metagol will fail on this task
+b:-
+  examples(4,400,Pos,Neg),
+  learn(Pos,Neg).
